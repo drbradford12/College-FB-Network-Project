@@ -1,0 +1,454 @@
+---
+title: "SOC Project Paper"
+author: "Denise Bradford"
+date: "11/3/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(cfbscrapR)
+library(tidyverse)
+library(devtools)
+library(reshape)
+library(igraph)
+library(gt)
+library(NbClust)
+library(RColorBrewer)
+library(ggraph)
+library(tidygraph)
+```
+
+```{r include=FALSE}
+load("/Users/denisebradford/Documents/SOC 902 - Network Analysis/Data Project.RData")
+load("/Users/denisebradford/Documents/SOC 902 - Network Analysis/Conference Data Project.RData")
+
+#network_data2$offense_conference <- 
+#  replace(network_data$offense_conference, network_data$offense_conference == "0", "Other")
+#network_data2$defense_conference <- 
+#  replace(network_data$defense_conference, network_data$defense_conference == "0", "Other")
+
+network_data2.mean <-
+  network_data2 %>% 
+  group_by(offense_conference,defense_conference)  %>%
+  mutate(fumble.mean = mean(`Fumble Recovery (Opponent)` + `Fumble Return Touchdown`),
+       interception.mean = mean(`Interception Return Touchdown` + `Pass Interception Return`),
+       sack.mean = mean(Sack),
+       weight.mean = mean(weights)) %>%
+  select(offense_conference,defense_conference,fumble.mean,interception.mean,sack.mean,weight.mean) %>%
+  distinct()
+```
+
+```{r, include=FALSE}
+all_def_data2.mean <-
+  all_def_data2 %>% 
+  group_by(offense_conference,defense_conference)  %>%
+  mutate(fumble.mean = mean(`Fumble Recovery (Opponent)` + `Fumble Return Touchdown`),
+       interception.mean = mean(`Interception Return Touchdown` + `Pass Interception Return`),
+       sack.mean = mean(Sack),
+       weight.mean = mean(weights)) %>%
+  select(offense_conference,defense_conference,fumble.mean,interception.mean,sack.mean,weight.mean) %>%
+  distinct()
+
+acc_network_data.mean <-
+  acc_network_data %>% 
+  group_by(offense_play,defense_play)  %>%
+  mutate(fumble.mean = mean(`Fumble Recovery (Opponent)` + `Fumble Return Touchdown`),
+       interception.mean = mean(`Interception Return Touchdown` + `Pass Interception Return`),
+       sack.mean = mean(Sack)) %>%
+  select(offense_play,defense_play,fumble.mean,interception.mean,sack.mean) %>%
+  distinct()
+
+big10_network_data.mean <-
+  big10_network_data %>% 
+  group_by(offense_play,defense_play)  %>%
+  mutate(fumble.mean = mean(`Fumble Recovery (Opponent)` + `Fumble Return Touchdown`),
+       interception.mean = mean(`Interception Return Touchdown` + `Pass Interception Return`),
+       sack.mean = mean(Sack)) %>%
+  select(offense_play,defense_play,fumble.mean,interception.mean,sack.mean) %>%
+  distinct()
+
+big12_network_data.mean <-
+  big12_network_data %>% 
+  group_by(offense_play,defense_play)  %>%
+  mutate(fumble.mean = mean(`Fumble Recovery (Opponent)` + `Fumble Return Touchdown`),
+       interception.mean = mean(`Interception Return Touchdown` + `Pass Interception Return`),
+       sack.mean = mean(Sack)) %>%
+  select(offense_play,defense_play,fumble.mean,interception.mean,sack.mean) %>%
+  distinct()
+
+pac12_network_data.mean <-
+  pac12_network_data %>% 
+  group_by(offense_play,defense_play)  %>%
+  mutate(fumble.mean = mean(`Fumble Recovery (Opponent)` + `Fumble Return Touchdown`),
+       interception.mean = mean(`Interception Return Touchdown` + `Pass Interception Return`),
+       sack.mean = mean(Sack)) %>%
+  select(offense_play,defense_play,fumble.mean,interception.mean,sack.mean) %>%
+  distinct()
+
+sec_network_data.mean <-
+  sec_network_data %>% 
+  group_by(offense_play,defense_play)  %>%
+  mutate(fumble.mean = mean(`Fumble Recovery (Opponent)` + `Fumble Return Touchdown`),
+       interception.mean = mean(`Interception Return Touchdown` + `Pass Interception Return`),
+       sack.mean = mean(Sack)) %>%
+  select(offense_play,defense_play,fumble.mean,interception.mean,sack.mean) %>%
+  distinct()
+```
+
+## Introduction
+*What NCAA football conference has the best defensive players?*
+
+Tenured football analysts, head coaches, defensive coordinators and historical football drafts tell us that the best defensive teams are likely to come from one of the power 5 NCAA conferences (ACC, SEC, Big Ten, Big 12, or PAC-12) but which conference has most defensively dominate plays compared to the others. An interesting question to ask would be whether the team has the most sacks, interceptions,interceptions for a touchdown, fumbles, fumbles for a touchdown that modifies the relationship of the teams defense.
+
+##Data Description
+Data was pulled from the cfbscrapR package:
+cfbscrapR is an R package for working with CFB data. It is an R API wrapper around https://collegefootballdata.com/. It provides users the capability to retrieve data from a plethora of endpoints and supplement that data with additional information (Expected Points Added/Win Probability added).
+
+We will use the *cfb_pbp_data* function that will pull data for the last 5 years, by week and play-by-play in each game from that week within the year. We will focus on the power 5 conferences along with the teams that they played. List of variables with definitions:
+ - offense_play: the team that has possession of the ball during the play (CHR)
+ - defense_play: the team that is defending their goal (CHR)
+ - offense_conference/defense_conference: the conference that the team is associated with in the NCAA (CHR)
+ - home: the home team (CHR)
+ - away: the away team (CHR)
+ - play_type*: each observation will have a play type description for the result of the down (CHR) 
+ - yards_gained: the number of yards that are gained during the time that the ball is in play, this value can be negative if the team moves further a way from the defenders goal. (NUM)
+ *using spread and count functions in dplyr, we were able to count the number of times a sack, fumble, interception, etc. occurred during a game.
+
+ 
+##Analysis Plan
+A multiblockmodel will be used to determine the best conference defensive teams. We will determine the conferences with the most sack ties, fumble ties and interception ties. If time permits, exploring the best team in each of the conferences will be determined using the blockmodel methodology. In future works, using the information from the regular session to make the conference championship, a two-mode affiliation network maybe useful to understand the "best" defense. 
+
+
+##Preliminary Data Analysis 
+```{r include=FALSE}
+#defense_full <- graph_from_data_frame(network_data2[c(2,4,7:12)], directed = TRUE) 
+defense_full <- graph_from_data_frame(network_data2.mean, directed = TRUE) 
+summary(defense_full)
+
+#Sacks
+edgelist_sack=network_data2.mean[network_data2.mean$sack.mean>0, c("defense_conference", "offense_conference", "sack.mean")]
+def_sack=graph_from_data_frame(d=edgelist_sack, directed=F) 
+def_sack=igraph::simplify(def_sack, edge.attr.comb="mean") 
+
+sack_mat=as_adjacency_matrix(def_sack, attr="sack.mean", sparse=F) 
+#head(sack_mat)
+sack_mat_in=t(sack_mat)
+
+sack_mat_std=(sack_mat-mean(sack_mat))/sd(sack_mat)
+#head(sack_mat_std)
+sack_mat_in_std=t(sack_mat_std)
+
+defense_sack <- delete.edges(defense_full, E(defense_full)[get.edge.attribute(defense_full,name = "sack.mean")==0])
+
+sack_layout <- layout_nicely(defense_sack)
+plot(defense_sack, layout=sack_layout, main = "Sack", edge.arrow.size=.5, edge.color="slateblue", edge.width=E(defense_sack)$sack.mean)
+
+#interceptions
+edgelist_interception=
+  network_data2.mean[network_data2.mean$interception.mean>0, c("defense_conference", "offense_conference", "interception.mean")]
+def_interception=graph_from_data_frame(d=edgelist_interception, directed=F) 
+def_interception=igraph::simplify(def_interception, edge.attr.comb="mean") 
+
+interception_mat=as_adjacency_matrix(def_interception, attr="interception.mean", sparse=F) 
+#head(interception_mat)
+interception_mat_in=t(interception_mat)
+
+interception_mat_std=(interception_mat-mean(interception_mat))/sd(interception_mat)
+#head(interception_mat_std)
+interception_mat_in_std=t(interception_mat_std)
+
+defense_interception <- delete.edges(defense_full, E(defense_full)[get.edge.attribute(defense_full,name = "interception.mean")==0])
+
+interception_layout <- layout_nicely(defense_interception)
+plot(defense_interception, layout=interception_layout, main = "Interception", edge.arrow.size=.5, edge.color="slateblue", edge.width=E(defense_interception)$interception.mean)
+
+#fumbles
+edgelist_fumble=
+  network_data2.mean[network_data2.mean$fumble.mean>0, c("defense_conference", "offense_conference", "fumble.mean")]
+def_fumble=graph_from_data_frame(d=edgelist_fumble, directed=F) 
+def_fumble=igraph::simplify(def_fumble, edge.attr.comb="mean") 
+
+fumble_mat=as_adjacency_matrix(def_fumble, attr="fumble.mean", sparse=F) 
+#head(fumble_mat)
+fumble_mat_in=t(fumble_mat)
+
+fumble_mat_std=(fumble_mat-mean(fumble_mat))/sd(fumble_mat)
+#head(fumble_mat_std)
+fumble_mat_in_std=t(fumble_mat_std)
+
+defense_fumble <- delete.edges(defense_full, E(defense_full)[get.edge.attribute(defense_full,name = "fumble.mean")==0])
+
+fumble_layout <- igraph::layout_nicely(defense_fumble)
+plot(defense_fumble, layout=fumble_layout, main = "Fumble", edge.arrow.size=.5, edge.color="slateblue", edge.width=E(defense_fumble)$fumble.mean)
+```
+
+```{r}
+defense_all <- graph_from_data_frame(all_def_data2.mean, directed = TRUE) 
+summary(defense_all)
+
+#Sacks
+edgelist_sack=all_def_data2.mean[all_def_data2.mean$sack.mean>0, c("defense_conference", "offense_conference", "sack.mean")]
+def_sack=graph_from_data_frame(d=edgelist_sack, directed=F) 
+def_sack=igraph::simplify(def_sack, edge.attr.comb="mean") 
+
+sack_mat=as_adjacency_matrix(def_sack, attr="sack.mean", sparse=F) 
+sack_mat_in=t(sack_mat)
+
+sack_mat_std=(sack_mat-mean(sack_mat))/sd(sack_mat)
+sack_mat_in_std=t(sack_mat_std)
+
+defense_sack <- delete.edges(defense_all, E(defense_all)[get.edge.attribute(defense_all,name = "sack.mean")==0])
+
+par(mfrow=c(2,2)) 
+sack_layout <- layout_with_dh(defense_sack)
+plot(defense_sack, layout=sack_layout, main = "Sacks", edge.arrow.size=.5, edge.arrow.width=.5, 
+     edge.color="light gray", edge.width=E(defense_sack)$sack.mean)
+
+#interceptions
+edgelist_interception=
+  all_def_data2.mean[all_def_data2.mean$interception.mean>0, c("defense_conference", "offense_conference", "interception.mean")]
+def_interception=graph_from_data_frame(d=edgelist_interception, directed=F) 
+def_interception=igraph::simplify(def_interception, edge.attr.comb="mean") 
+
+interception_mat=as_adjacency_matrix(def_interception, attr="interception.mean", sparse=F) 
+interception_mat_in=t(interception_mat)
+
+interception_mat_std=(interception_mat-mean(interception_mat))/sd(interception_mat)
+interception_mat_in_std=t(interception_mat_std)
+
+defense_interception <- delete.edges(defense_all, E(defense_all)[get.edge.attribute(defense_all,name = "interception.mean")==0])
+
+interception_layout <- layout_with_dh(defense_interception)
+plot(defense_interception, layout=interception_layout, main = "Interceptions",
+     edge.arrow.size=.5, edge.arrow.width=.5, 
+     edge.color="light gray",  
+     edge.width=E(defense_interception)$interception.mean)
+
+#fumbles
+edgelist_fumble=
+  all_def_data2.mean[all_def_data2.mean$fumble.mean>0, c("defense_conference", "offense_conference", "fumble.mean")]
+def_fumble=graph_from_data_frame(d=edgelist_fumble, directed=F) 
+def_fumble=igraph::simplify(def_fumble, edge.attr.comb="mean") 
+
+fumble_mat=as_adjacency_matrix(def_fumble, attr="fumble.mean", sparse=F) 
+fumble_mat_in=t(fumble_mat)
+
+fumble_mat_std=(fumble_mat-mean(fumble_mat))/sd(fumble_mat)
+fumble_mat_in_std=t(fumble_mat_std)
+
+defense_fumble <- delete.edges(defense_all, E(defense_all)[get.edge.attribute(defense_all,name = "fumble.mean")==0])
+
+fumble_layout <- igraph::layout_with_dh(defense_fumble)
+plot(defense_fumble, layout=fumble_layout, main = "Fumbles", 
+     edge.arrow.size=.5, edge.arrow.width=.5, 
+     edge.color="light gray", 
+     edge.width=E(defense_fumble)$fumble.mean)
+
+
+#weight of all defense acts
+edgelist_weight=
+  all_def_data2.mean[all_def_data2.mean$weight.mean>0, c("defense_conference", "offense_conference", "weight.mean")]
+def_weight=graph_from_data_frame(d=edgelist_weight, directed=F) 
+def_weight=igraph::simplify(def_weight, edge.attr.comb="mean") 
+
+weight_mat=as_adjacency_matrix(def_weight, attr="weight.mean", sparse=F) 
+weight_mat_in=t(weight_mat)
+
+weight_mat_std=(weight_mat-mean(weight_mat))/sd(weight_mat)
+weight_mat_in_std=t(weight_mat_std)
+
+defense_weight <- delete.edges(defense_all, E(defense_all)[get.edge.attribute(defense_all,name = "weight.mean")==0])
+
+weight_layout <- igraph::layout_with_dh(defense_weight)
+plot(defense_weight, layout=weight_layout, main = "Weight with Fumbles, Sacks & Interceptions",
+     edge.arrow.size=.5, edge.arrow.width=.5, 
+     edge.color="light gray",
+     edge.width=E(defense_weight)$weight.mean/2)
+
+
+```
+
+
+#Calculating Distance Between Nodes in the Network based on Pattern of Ties
+```{r}
+sacks_interception_fumble_std = cbind(sack_mat_std, sack_mat_in_std, 
+                                      interception_mat_std, fumble_mat_std)
+dim(sacks_interception_fumble_std)
+euclid_dist = dist(x=sacks_interception_fumble_std, method = "euclidean")
+euclid_dist
+
+fit=cmdscale(euclid_dist, k=2)
+fit
+
+x=fit[,1]
+y=fit[,2]
+
+plot(x, y, xlab = "Coordinate 1", ylab = "Coordinate 2", main = "2 Dimensional MDS Solution", type = "n")
+text(x,y, labels = unique(all_def_data2.mean$defense_conference), cex = 1)
+```
+
+#Hierarchical Clustering
+```{r}
+hc=hclust(euclid_dist)
+plot(hc)
+plot.clusters = rect.hclust(hc, h=11)
+
+plot(hc)
+plot.clusters2 = rect.hclust(hc, h=10)
+
+hc_ids=cutree(hc, h=11)
+hc_ids
+
+clusters=NbClust(sacks_interception_fumble_std, distance = "euclidean", 
+                 min.nc=2, max.nc=8,
+                 method="complete", index="ch")
+clusters
+```
+
+#Role Analysis
+```{r}
+id_dat = data.frame(ids=unique(all_def_data2.mean$defense_conference), position=hc_ids)
+id_dat = id_dat[order(id_dat$position),]
+id_dat
+
+fumble_mat_rearrange = fumble_mat[id_dat$ids, id_dat$ids]
+sack_mat_rearrange = sack_mat[id_dat$ids, id_dat$ids]
+interception_mat_rearrange = interception_mat[id_dat$ids, id_dat$ids]
+
+column_cols=c("red","green","black","blue","purple")
+
+heatmap(sack_mat_rearrange, Rowv=NA, Colv=NA, revC=T,
+        col=colorRampPalette(brewer.pal(6, "Blues"))(25),
+        ColSideColors=column_cols[id_dat$position],
+        RowSideColors=column_cols[id_dat$position], symm=T,
+        main = "heatmap(Sack Data)")
+
+heatmap(fumble_mat_rearrange, Rowv=NA, Colv=NA, revC=T,
+        col=colorRampPalette(brewer.pal(6, "Blues"))(25),
+        ColSideColors=column_cols[id_dat$position],
+        RowSideColors=column_cols[id_dat$position], symm=T,
+        main = "heatmap(Fumble Data)")
+
+heatmap(interception_mat_rearrange, Rowv=NA, Colv=NA, revC=T,
+        col=colorRampPalette(brewer.pal(6, "Blues"))(25),
+        ColSideColors=column_cols[id_dat$position],
+        RowSideColors=column_cols[id_dat$position], symm=T,
+        main = "heatmap(Interception Data)")
+
+```
+
+```{r include = FALSE}
+block_model_edgelist_function=function(block_model, relation_label, directed=T){ 
+#Inputs are the blockmodel, the name of the relation, 
+#and if the relation is assumed to be undirected
+
+#First we grab the actual matrix from the blockmodel:
+block_mat=block_model$block.model
+
+#Here we set any NA to 0.
+block_mat[is.na(block_mat)]=0
+
+#Now we create a little network based on the matrix.
+net_block=network(block_mat, loops=T, directed=directed)
+
+#Here we extract the edgelist:
+edges_netblock=as.edgelist(net_block)
+
+#Now we get the edge weights, stringing out the matrix
+#into a vector. We only extract those weights corresponding
+#to where an edge exists, defined by the edgelist 
+#extracted above.
+weight_edge=c(block_mat[edges_netblock])
+
+#Now we create a little data frame putting the information together.
+block_edgelist=data.frame(edges_netblock, weight=weight_edge, 
+                          Tie=relation_label)
+
+#Here we create the additional weighting scheme,
+#where weight is equal to 0, 1, or 2, depending if it is
+#less than the mean, greater than the mean (but less than 1 sd above mean)
+#or greater than 1 sd above the mean. 
+edge_mean=mean(block_mat)
+edge_sd=sd(block_mat)
+edge_max=max(block_mat)
+
+block_edgelist$WeightRecode=cut(block_edgelist$weight, 
+    breaks=c(0, edge_mean, edge_mean+edge_sd, edge_max),
+    include.lowest=T, right=F, labels=c("0", "1", "2")) 
+
+colnames(block_edgelist)[1:2]=c("sender", "receiver")
+
+block_edgelist
+}
+
+```
+
+#Constructing the Blockmodel
+```{r}
+detach(package:igraph)
+library(sna)
+
+blockmod_sack=blockmodel(sack_mat, ec=hc_ids)
+blockmod_sack
+
+blockmod_fumble=blockmodel(fumble_mat, ec=hc_ids)
+blockmod_fumble
+
+blockmod_interception=blockmodel(interception_mat, ec=hc_ids)
+blockmod_interception
+
+blockedges_sack=block_model_edgelist_function(block_model=blockmod_sack, 
+                                                relation_label="sack", 
+                                                directed=T)
+head(blockedges_sack)
+
+blockedges_fumble=block_model_edgelist_function(block_model=blockmod_fumble, 
+                                                relation_label="fumble", 
+                                                directed=F)
+head(blockedges_fumble)
+
+blockedges_interception=block_model_edgelist_function(block_model=blockmod_interception, 
+                                              relation_label="interception", 
+                                              directed=F)
+head(blockedges_interception)
+
+block_dat=rbind(blockedges_sack, blockedges_fumble, blockedges_interception)
+
+block_dat=block_dat[block_dat$WeightRecode %in% c("1", "2"),]
+
+plot_net=tbl_graph(nodes=data.frame(ids=paste("Block", 1:3)), edges=block_dat, directed=F)
+
+ggraph(plot_net, layout='circle') + 
+  geom_edge_parallel(aes(colour=Tie))+
+  geom_node_text(aes(label=ids), 
+                 nudge_x=c(.15, 0, -.15, 0),                         
+                 nudge_y=c(0, .10, 0, -.10))+ 
+  theme_graph()
+
+ggraph(plot_net, layout='circle') + 
+  geom_edge_parallel(aes(colour=Tie))+
+  geom_edge_loop(aes(colour="sack", span=45, strength=.5))+
+  geom_edge_loop(aes(colour="interception", direction=90, span=45, strength=.5))+
+  geom_edge_loop(aes(colour="fumble", direction=135, span=45, strength=.5))+
+  geom_node_text(aes(label=ids), 
+                 nudge_x=c(.16, .17, -.16, 0),                         
+                 nudge_y=c(-.03, -.02, -.03, -.10))+
+  theme_graph()
+
+rowSums(blockmod_sack$block.model, na.rm=T)
+round(blockmod_sack$block.model[,3], 3)
+
+rowSums(blockmod_fumble$block.model, na.rm=T)
+round(blockmod_fumble$block.model[,3], 3)
+
+rowSums(blockmod_interception$block.model, na.rm=T)
+round(blockmod_interception$block.model[,3], 3)
+
+#block 1
+table(all_def_data2.mean$defense_conference[hc_ids==1])
+#block 2
+table(all_def_data2.mean$defense_conference[hc_ids==2])
+#block 3
+table(all_def_data2.mean$defense_conference[hc_ids==3])
+```

@@ -1,0 +1,66 @@
+---
+title: "SOC Project Paper"
+author: "Denise Bradford"
+date: "11/3/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(cfbscrapR)
+library(tidyverse)
+library(devtools)
+library(reshape)
+library(igraph)
+library(gt)
+```
+
+```{r include=FALSE}
+load("/Users/denisebradford/Documents/SOC 902 - Network Analysis/Data Project.RData")
+
+```
+
+## Introduction
+*What NCAA football conference has the best defensive players?*
+
+Tenured football analysts, head coaches, defensive coordinators and historical football drafts tell us that the best defensive teams are likely to come from one of the power 5 NCAA conferences (ACC, SEC, Big Ten, Big 12, or PAC-12) but which conference has most defensively dominate plays compared to the others. An interesting question to ask would be whether the team has the most sacks, interceptions,interceptions for a touchdown, fumbles, fumbles for a touchdown that modifies the relationship of the teams defense.
+
+##Data Description
+Data was pulled from the cfbscrapR package:
+cfbscrapR is an R package for working with CFB data. It is an R API wrapper around https://collegefootballdata.com/. It provides users the capability to retrieve data from a plethora of endpoints and supplement that data with additional information (Expected Points Added/Win Probability added).
+
+We will use the *cfb_pbp_data* function that will pull data for the last 5 years, by week and play-by-play in each game from that week within the year. We will focus on the power 5 conferences along with the teams that they played. List of variables with definitions:
+ - offense_play: the team that has possession of the ball during the play (CHR)
+ - defense_play: the team that is defending their goal (CHR)
+ - offense_conference/defense_conference: the conference that the team is associated with in the NCAA (CHR)
+ - home: the home team (CHR)
+ - away: the away team (CHR)
+ - play_type*: each observation will have a play type description for the result of the down (CHR) 
+ - yards_gained: the number of yards that are gained during the time that the ball is in play, this value can be negative if the team moves further a way from the defenders goal. (NUM)
+ *using spread and count functions in dplyr, we were able to count the number of times a sack, fumble, interception, etc. occurred during a game.
+
+ 
+ ##Analysis Plan
+ A multiblockmodel will be used to determine the best conference defensive teams. We will determine the conferences with the most sack ties, fumble ties and interception ties. If time permits, exploring the best team in each of the conferences will be determined using the blockmodel methodology. In future works, using the information from the regular session to make the conference championship, a two-mode affiliation network maybe useful to understand the "best" defense. 
+
+
+##Preliminary Data Analysis for Final Project using the Blockmodel 
+
+```{r}
+defense_full <- graph_from_data_frame(network_data2[c(2,4,7:12)], directed = TRUE, vertices=attributes.name) 
+summary(defense_full)
+
+edgelist_sack=network_data2[network_data2$Sack>0, c("defense_conference", "offense_conference", "Sack")]
+def_sack=graph_from_data_frame(d=edgelist_sack, directed=F) 
+def_sack=simplify(def_sack, edge.attr.comb="mean") 
+
+sack_mat=as_adjacency_matrix(def_sack, attr="Sack", sparse=F) 
+sack_mat
+sack_mat_in=t(sack_mat)
+sack_mat_in
+
+sack_mat_std=(sack_mat-mean(sack_mat))/sd(sack_mat)
+sack_mat_std
+sack_mat_in_std=t(sack_mat_std)
+sack_mat_in_std
+```
